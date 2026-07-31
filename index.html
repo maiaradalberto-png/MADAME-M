@@ -810,8 +810,26 @@
             <button class="btn btn-gold" onclick="openModal('modal-produto')">+ Cadastrar Produto</button>
           </div>
         </div>
+        <!-- Filtros -->
+        <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+          <input type="text" id="estoque-busca" placeholder="🔍 Buscar por nome ou marca..." oninput="renderEstoque()"
+            style="flex:1;min-width:180px;background:var(--black-soft);border:1px solid var(--gold-border);border-radius:var(--radius);padding:8px 12px;color:var(--text);font-family:Inter,sans-serif;font-size:12.5px;outline:none">
+          <select id="estoque-categoria" onchange="renderEstoque()"
+            style="background:var(--black-soft);border:1px solid var(--gold-border);border-radius:var(--radius);padding:8px 12px;color:var(--text);font-family:Inter,sans-serif;font-size:12.5px;outline:none">
+            <option value="">Todas as categorias</option>
+            <option>Perfume Feminino</option>
+            <option>Perfume Masculino</option>
+            <option>Perfume Unissex</option>
+            <option>Miniatura / Amostra</option>
+            <option>Body Splash</option>
+            <option>Cuidados Corporais</option>
+            <option>Cuidados Faciais</option>
+            <option>Kits</option>
+            <option>Outros</option>
+          </select>
+        </div>
         <table class="tbl">
-          <thead><tr><th>Produto</th><th>Marca</th><th>Tamanho</th><th>Qtd.</th><th>Mín.</th><th>Custo</th><th>Preço Venda</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><th>Produto</th><th>Marca</th><th>Categoria</th><th>Tam.</th><th>Qtd.</th><th>Custo</th><th>Preço Venda</th><th>Status</th><th></th></tr></thead>
           <tbody id="tbl-estoque"></tbody>
         </table>
       </div>
@@ -1221,6 +1239,21 @@
       <div class="form-group">
         <label>Marca *</label>
         <input type="text" id="p-marca" placeholder="Ex: Lancôme">
+      </div>
+      <div class="form-group">
+        <label>Categoria</label>
+        <select id="p-categoria">
+          <option value="">— Selecione —</option>
+          <option>Perfume Feminino</option>
+          <option>Perfume Masculino</option>
+          <option>Perfume Unissex</option>
+          <option>Miniatura / Amostra</option>
+          <option>Body Splash</option>
+          <option>Cuidados Corporais</option>
+          <option>Cuidados Faciais</option>
+          <option>Kits</option>
+          <option>Outros</option>
+        </select>
       </div>
       <div class="form-group">
         <label>Tamanho / Volume</label>
@@ -1667,6 +1700,7 @@ function salvarProduto() {
     id: uid(),
     nome,
     marca: document.getElementById('p-marca').value.trim(),
+    categoria: document.getElementById('p-categoria').value,
     tam: document.getElementById('p-tam').value.trim(),
     familia: document.getElementById('p-familia').value,
     subfamilia: document.getElementById('p-subfamilia').value,
@@ -1681,7 +1715,7 @@ function salvarProduto() {
   STATE.produtos.push(prod);
   save();
   closeModal('modal-produto');
-  ['p-nome','p-marca','p-tam','p-familia','p-subfamilia','p-qtd','p-min','p-custo','p-preco','p-obs'].forEach(id=>{
+  ['p-nome','p-marca','p-categoria','p-tam','p-familia','p-subfamilia','p-qtd','p-min','p-custo','p-preco','p-obs'].forEach(id=>{
     const el=document.getElementById(id);
     if(el) el.value='';
   });
@@ -2172,23 +2206,86 @@ function renderMetas() {
 
 function renderEstoque() {
   renderAlertasEstoque('alertas-estoque-page');
+  const busca = (document.getElementById('estoque-busca')||{value:''}).value.toLowerCase().trim();
+  const catFiltro = (document.getElementById('estoque-categoria')||{value:''}).value;
+
+  let lista = [...STATE.produtos].sort((a,b)=>a.nome.localeCompare(b.nome));
+  if(busca) lista = lista.filter(p=>
+    p.nome.toLowerCase().includes(busca) || (p.marca||'').toLowerCase().includes(busca)
+  );
+  if(catFiltro) lista = lista.filter(p=>(p.categoria||'')=== catFiltro);
+
   const tbody = document.getElementById('tbl-estoque');
-  tbody.innerHTML = STATE.produtos.length
-    ? STATE.produtos.map(p=>{
+  tbody.innerHTML = lista.length
+    ? lista.map(p=>{
         const alerta = p.qtd === 0 || (p.min > 0 && p.qtd <= p.min);
-        return `<tr${!p.qtd?` class="paused-row"`:''}>
-          <td>${p.nome}</td>
-          <td class="muted">${p.marca}</td>
+        return `<tr${p.qtd===0?' style="opacity:0.6"':''}>
+          <td><strong>${p.nome}</strong></td>
+          <td class="muted">${p.marca||'—'}</td>
+          <td class="muted">${p.categoria?`<span class="badge badge-gray" style="font-size:10px">${p.categoria}</span>`:'—'}</td>
           <td class="muted">${p.tam||'—'}</td>
           <td style="font-weight:600;color:${alerta?'var(--red)':'var(--text)'}">${p.qtd}</td>
-          <td class="muted">${p.min}</td>
           <td class="muted">${fmt(p.custo)}</td>
           <td class="gold-val">${fmt(p.preco)}</td>
           <td>${alerta?'<span class="badge badge-red">Crítico</span>':p.qtd===0?'<span class="badge badge-gray">Zerado</span>':'<span class="badge badge-green">OK</span>'}</td>
-          <td><button class="btn btn-ghost" onclick="deleteProduto('${p.id}')" style="padding:4px 10px;font-size:11px">✕</button></td>
+          <td style="display:flex;gap:6px">
+            <button class="btn btn-outline" onclick="editarProduto('${p.id}')" style="padding:4px 10px;font-size:11px">✎</button>
+            <button class="btn btn-ghost" onclick="deleteProduto('${p.id}')" style="padding:4px 10px;font-size:11px">✕</button>
+          </td>
         </tr>`;
       }).join('')
-    : '<tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:20px">Nenhum produto cadastrado</td></tr>';
+    : `<tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:20px">${busca||catFiltro?'Nenhum produto encontrado para este filtro':'Nenhum produto cadastrado'}</td></tr>`;
+}
+
+function editarProduto(id) {
+  const p = STATE.produtos.find(x=>x.id===id);
+  if(!p) return;
+  // reutiliza o modal de produto preenchido
+  document.getElementById('p-nome').value = p.nome||'';
+  document.getElementById('p-marca').value = p.marca||'';
+  document.getElementById('p-categoria').value = p.categoria||'';
+  document.getElementById('p-tam').value = p.tam||'';
+  document.getElementById('p-familia').value = p.familia||'';
+  updateSubfamilias('p');
+  document.getElementById('p-subfamilia').value = p.subfamilia||'';
+  document.getElementById('p-qtd').value = p.qtd||0;
+  document.getElementById('p-min').value = p.min||0;
+  document.getElementById('p-custo').value = p.custo||'';
+  document.getElementById('p-preco').value = p.preco||'';
+  document.getElementById('p-obs').value = p.obs||'';
+  // mudar botão para salvar edição
+  const btn = document.querySelector('#modal-produto .btn-gold');
+  btn.textContent = 'Salvar Alterações';
+  btn.onclick = () => salvarEdicaoProduto(id);
+  document.querySelector('#modal-produto .modal-title').textContent = 'Editar Produto';
+  openModal('modal-produto');
+}
+
+function salvarEdicaoProduto(id) {
+  const p = STATE.produtos.find(x=>x.id===id);
+  if(!p) return;
+  const nome = document.getElementById('p-nome').value.trim();
+  if(!nome) return toast('Nome obrigatório','error');
+  p.nome = nome;
+  p.marca = document.getElementById('p-marca').value.trim();
+  p.categoria = document.getElementById('p-categoria').value;
+  p.tam = document.getElementById('p-tam').value.trim();
+  p.familia = document.getElementById('p-familia').value;
+  p.subfamilia = document.getElementById('p-subfamilia').value;
+  p.qtd = +document.getElementById('p-qtd').value||0;
+  p.min = +document.getElementById('p-min').value||0;
+  p.custo = +document.getElementById('p-custo').value||0;
+  p.preco = +document.getElementById('p-preco').value||0;
+  p.obs = document.getElementById('p-obs').value.trim();
+  save();
+  // resetar modal para modo cadastro
+  const btn = document.querySelector('#modal-produto .btn-gold');
+  btn.textContent = 'Salvar Produto';
+  btn.onclick = salvarProduto;
+  document.querySelector('#modal-produto .modal-title').textContent = 'Cadastrar Produto';
+  closeModal('modal-produto');
+  toast('Produto atualizado! ✦');
+  renderEstoque();
 }
 
 function redefinirMinimos() {
